@@ -19,11 +19,7 @@ def solve(G):
     T = nx.minimum_spanning_tree(G)
     return T
 
-
-# Here's an example of how to run your solver.
-
-# Usage: python3 solver.py test.in
-
+# Usage: python3 solver.py inputs
 if __name__ == '__main__':
     assert len(sys.argv) == 2
     dir = sys.argv[1]
@@ -31,5 +27,5 @@ if __name__ == '__main__':
     	G = read_input_file(dir + '/' + path)
     	T = solve(G)
     	assert is_valid_network(G, T)
-    	print("Average  pairwise distance: {}".format(average_pairwise_distance(T)))
+    	print("Average pairwise distance: {}".format(average_pairwise_distance(T)))
     	write_output_file(T, 'outputs/' + path[:(len(path)-3)] + '.out')
