@@ -16,7 +16,31 @@ def solve(G):
     """
 
     # TODO: your code here!
-    T = nx.minimum_spanning_tree(G)
+    numNodes = G.number_of_nodes()
+    numEdges = G.number_of_edges()
+    if G.number_of_nodes() == 3 and G.number_of_edges == 2:
+        return G
+    if numEdges == numNodes * (numNodes -1) / 2:
+        T = nx.Graph()
+        T.add_node(list(G)[0])
+    elif numEdges == (numNodes- 1):
+        T = solveTree(G)
+    else : 
+        T = nx.minimum_spanning_tree(G)
+    return T
+
+
+def solveTree(G):
+    nonleaf = [v for v in G.nodes() if G.degree[v] > 1]
+    T = G.subgraph(nonleaf).copy()
+    avg = T.size(weight='weight') / len(nonleaf)
+    leafs = [v for v in G.nodes() if G.degree[v] == 1]
+    for v in leafs:
+        u = G.neighbors(v)
+        weight = G.get_edge_data(v, u, default=0)
+        if weight < avg and weight != 0:
+            T.add_node(v)
+            avg += weight
     return T
 
 # Usage: python3 solver.py inputs
