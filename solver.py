@@ -57,19 +57,26 @@ def solveGraph(G):
     return the ds with the shortest path.
     '''
     minSet = None
-    minDistance = G.number_of_nodes()
+    minSize = G.size(weight = 'weight') / G.number_of_edges()
     for v in G.nodes():
         ds = nx.dominating_set(G, v)
-        temp = G.subgraph(ds).copy()
-        if nx.is_connected(temp) and len(temp) < minDistance:
+        if len(ds) == 1:
             minSet = ds
-            minDistance = len(temp)
+            break;
+        temp = G.subgraph(ds).copy()
+        if nx.is_connected(temp):
+            avg = temp.size(weight = 'weight') / temp.number_of_edges()
+            if  avg < minSize:
+                minSet = ds
+                minSize = avg 
     if minSet == None:
         return nx.minimum_spanning_tree(G, weight='weight')
-    T = nx.Graph()
-    for v in minSet:
-        T.add_node(v)
-    return T
+    else :
+        T = nx.Graph()
+        for v in minSet:
+            T.add_node(v)
+        return T
+
 
 def getShortestPath(G, ds):
     return
