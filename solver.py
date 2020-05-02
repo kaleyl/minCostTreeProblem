@@ -20,8 +20,11 @@ def solve(G):
     # TODO: your code here!
     numNodes = G.number_of_nodes()
     numEdges = G.number_of_edges()
+    sortedNodes = sorted(G.degree, key=lambda x: x[1], reverse=True)
     if G.number_of_nodes() == 3 and G.number_of_edges == 2:
         return G
+    elif G.degree(sortedNodes[0]) == numNodes - 1:
+        return sortedNodes[0]
     if numEdges == numNodes * (numNodes - 1) / 2:
         T = nx.Graph()
         T.add_node(list(G)[0])
@@ -54,6 +57,7 @@ def solveTree(G):
     return T
 
 def solveGraph(G):
+    from networkx.utils import UnionFind
     from random import choice
 
     T = G.__class__()
@@ -64,7 +68,7 @@ def solveGraph(G):
     # node = choice(list(G.nodes))
     total = 0
     count = 0
-    edges = sorted(G.edges(data=True), key=lambda t: t[2].get('weight', 1))
+    edges = sorted(G.edges(data=True), key=lambda t: t[2].get('weight', 1) / (G.degree(t[0]) + G.degree(t[1])))
     edges = sortEdgeByDegree(G, edges)
     for u, v, d in edges:
         if G.degree[u] == G.number_of_nodes() - 1 and not G.has_edge(u, u):
@@ -84,30 +88,32 @@ def solveGraph(G):
             subtrees.union(u, v)
         if nx.is_tree(T) and nx.is_dominating_set(G, T.nodes):
             break
-
-    edges_T = sorted(T.edges(data=True), key=lambda t: t[2].get('weight', 1), reverse=True)
-    for u, v, d in edges_T:
-        avg_pairwise_dist = average_pairwise_distance_fast(T)
-        T.remove_edge(u, v)
-        graphs = list(T.subgraph(c).copy() for c in nx.connected_components(T))
-        if nx.is_tree(graphs[0]) and nx.is_dominating_set(G, graphs[0].nodes):
-            new_avg_pairwise_dist = average_pairwise_distance_fast(graphs[0])
-            if new_avg_pairwise_dist > avg_pairwise_dist:
-                T.add_edge(u, v, weight=d.get('weight', 1))
+    old_T = nx.Graph(T)
+    while len(old_T) != len(T):
+        edges_T = sorted(T.edges(data=True), key=lambda t: t[2].get('weight', 1), reverse=True)
+        for u, v, d in edges_T:
+            avg_pairwise_dist = average_pairwise_distance_fast(T)
+            T.remove_edge(u, v)
+            graphs = list(T.subgraph(c).copy() for c in nx.connected_components(T))
+            if nx.is_tree(graphs[0]) and nx.is_dominating_set(G, graphs[0].nodes):
+                new_avg_pairwise_dist = average_pairwise_distance_fast(graphs[0])
+                if new_avg_pairwise_dist > avg_pairwise_dist:
+                    T.add_edge(u, v, weight=d.get('weight', 1))
+                else:
+                    T = nx.Graph(graphs[0])
+                    if len(graphs[1]) > 1:
+                        break
+            elif nx.is_tree(graphs[1]) and nx.is_dominating_set(G, graphs[1].nodes):
+                new_avg_pairwise_dist = average_pairwise_distance_fast(graphs[1])
+                if new_avg_pairwise_dist > avg_pairwise_dist:
+                    T.add_edge(u, v, weight=d.get('weight', 1))
+                else:
+                    T = nx.Graph(graphs[1])
+                    if len(graphs[0]) > 1:
+                        break
             else:
-                T = nx.Graph(graphs[0])
-                if len(graphs[1]) > 1:
-                    break
-        elif nx.is_tree(graphs[1]) and nx.is_dominating_set(G, graphs[1].nodes):
-            new_avg_pairwise_dist = average_pairwise_distance_fast(graphs[1])
-            if new_avg_pairwise_dist > avg_pairwise_dist:
                 T.add_edge(u, v, weight=d.get('weight', 1))
-            else:
-                T = nx.Graph(graphs[1])
-                if len(graphs[0]) > 1:
-                    break
-        else:
-            T.add_edge(u, v, weight=d.get('weight', 1))
+        old_T = nx.Graph(T)
 
 
     return T
@@ -120,7 +126,6 @@ def sortEdgeByDegree(G, edges):
         u, v, d =  edges[i]
         if d.get('weight', 1) != currWeight:
             currWeight = d.get('weight', 1)
-            #currMax = max(G.degree(v), G.degree(u))
 
         j = i - 1
       
