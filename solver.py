@@ -1,9 +1,7 @@
 import networkx as nx
 from parse import read_input_file, write_output_file
-from utils import is_valid_network, average_pairwise_distance
+from utils import is_valid_network, average_pairwise_distance, average_pairwise_distance_fast
 from collections import defaultdict
-from networkx.utils import UnionFind
-from utils import *
 import sys
 import os
 
@@ -18,6 +16,7 @@ def solve(G):
     """
 
     # TODO: your code here!
+    '''
     numNodes = G.number_of_nodes()
     numEdges = G.number_of_edges()
     sortedNodes = sorted(G.degree, key=lambda x: x[1], reverse=True)
@@ -33,30 +32,10 @@ def solve(G):
     else : 
         T = solveGraph(G)
     return T
+    '''
+    return greedy(G)
 
-
-def solveTree(G):
-    """ solve for tree 
-    - evaluating whether a leaf is worth adding to T
-    
-    """
-    nonleaf = [v for v in G.nodes() if G.degree[v] > 1]
-    T = G.subgraph(nonleaf).copy()
-    avg = average_pairwise_distance_fast(T)
-    leafs = [v for v in G.nodes() if G.degree[v] == 1]
-    for v in leafs:
-        u = G.neighbors(v)
-        weight = G.get_edge_data(v, u, default=0)
-        if weight < avg and weight != 0:
-            T.add_node(v)
-            tempAvg = average_pairwise_distance_fast(T)
-            if tempAvg > avgv:
-                T.remove_node(v)
-            else:
-                avg = tempAvg
-    return T
-
-def solveGraph(G):
+def new_kruskal(G, weight='weight'):
     from networkx.utils import UnionFind
     from random import choice
 
@@ -64,12 +43,18 @@ def solveGraph(G):
     if len(G) == 1:
         return G
     subtrees = UnionFind()
-    subsets = UnionFind()
-    # node = choice(list(G.nodes))
-    total = 0
-    count = 0
-    edges = sorted(G.edges(data=True), key=lambda t: t[2].get('weight', 1) / (G.degree(t[0]) + G.degree(t[1])))
-    edges = sortEdgeByDegree(G, edges)
+    d = {}
+    for node in G.nodes():
+        G_copy = nx.Graph(G)
+        G_copy.remove_node(node)
+        if not nx.is_connected(G_copy):
+            d[node] = float('inf')
+        else:
+            d[node] = average_pairwise_distance_fast(G_copy)
+    def kruskal_key(t):
+        u, v, d = t
+        return d[u] + d[v]
+    edges = sorted(G.edges(data=True), key=lambda t: d[t[0]] + d[t[1]], reverse=True)
     for u, v, d in edges:
         if G.degree[u] == G.number_of_nodes() - 1 and not G.has_edge(u, u):
             T = nx.Graph()
@@ -89,7 +74,7 @@ def solveGraph(G):
         if nx.is_tree(T) and nx.is_dominating_set(G, T.nodes):
             break
     old_T = nx.Graph(T)
-    while len(old_T) != len(T):
+    while True:
         edges_T = sorted(T.edges(data=True), key=lambda t: t[2].get('weight', 1), reverse=True)
         for u, v, d in edges_T:
             avg_pairwise_dist = average_pairwise_distance_fast(T)
@@ -113,34 +98,72 @@ def solveGraph(G):
                         break
             else:
                 T.add_edge(u, v, weight=d.get('weight', 1))
+        if len(old_T) == len(T): break
         old_T = nx.Graph(T)
+    return T
 
+def greedy(G, weight='weight'):
+    from random import choice
+
+    T = G.__class__()
+    if len(G) == 1:
+        return G
+    node = choice(list(G.nodes()))
+    next_edges = list(G.edges(node, data=True))
+    T.add_node(node)
+
+    def heuristic(edge):
+        if edge[0] == edge[1]: return float('inf')
+        T_copy = nx.Graph(T)
+        T_copy.add_edge(edge[0], edge[1], weight=edge[2].get('weight', 1))
+        T_copy.add_node(edge[0])
+        T_copy.add_node(edge[1])
+        if not nx.is_tree(T_copy): return float('inf')
+        return average_pairwise_distance_fast(T_copy)
+
+    while True:
+        curr_avg = average_pairwise_distance_fast(T)
+        min_edge = min(next_edges, key=heuristic)
+        min_new_avg = heuristic(min_edge)
+        if is_valid_network(G, T) and min_new_avg > curr_avg:
+            break
+        else:
+            if T.has_node(min_edge[0]):
+                T.add_node(min_edge[1])
+                T.add_edge(min_edge[0], min_edge[1], weight=min_edge[2].get('weight', 1))
+                next_edges = next_edges + (list(G.edges(min_edge[1], data=True)))
+            elif T.has_node(min_edge[1]):
+                T.add_node(min_edge[0])
+                T.add_edge(min_edge[0], min_edge[1], weight=min_edge[2].get('weight', 1))
+                next_edges = next_edges + (list(G.edges(min_edge[0], data=True)))
+            next_edges = list(filter(lambda e: not (e[0] == min_edge[0] and e[1] == min_edge[1]) and not (e[0] == min_edge[1] and e[1] == min_edge[0]), next_edges))
 
     return T
 
 
-def sortEdgeByDegree(G, edges):
-    #currMax = max(G.degree(edges[0][1]), G.degree(edges[0][0]))
-    currWeight = edges[0][2].get('weight', 1)
-    for i in range(1, len(edges)):
-        u, v, d =  edges[i]
-        if d.get('weight', 1) != currWeight:
-            currWeight = d.get('weight', 1)
 
-        j = i - 1
-      
-        while j >= 0:
-            s, t, dist = edges[j]
-            if dist.get('weight', 1) != currWeight:
-                break
-            if (G.degree(v) + G.degree(u)) > (G.degree(s) + G.degree(t)):
-                temp = edges[i]
-                edges[i] = edges[j]
-                edges[j] = temp
-            j -= 1
-    return edges
+def solveTree(G):
+    """ solve for tree 
+    - evaluating whether a leaf is worth adding to T
+    
+    """
+    nonleaf = [v for v in G.nodes() if G.degree[v] > 1]
+    T = G.subgraph(nonleaf).copy()
+    avg = average_pairwise_distance_fast(T)
+    leafs = [v for v in G.nodes() if G.degree[v] == 1]
+    for v in leafs:
+        u = G.neighbors(v)
+        weight = G.get_edge_data(v, u, default=0)
+        if weight < avg and weight != 0:
+            T.add_node(v)
+            tempAvg = average_pairwise_distance_fast(T)
+            if tempAvg > avgv:
+                T.remove_node(v)
+            else:
+                avg = tempAvg
+    return T
 
-        
+
 
 
 # Usage: python3 solver.py inputs
@@ -148,8 +171,10 @@ if __name__ == '__main__':
     assert len(sys.argv) == 2
     dir = sys.argv[1]
     for path in os.listdir(dir):
-    	G = read_input_file(dir + '/' + path)
-    	T = solve(G)
-    	assert is_valid_network(G, T)
-    	print("Average pairwise distance: {}".format(average_pairwise_distance(T)))
-    	write_output_file(T, 'outputs/' + path[:(len(path)-3)] + '.out')
+        print(path)
+        G = read_input_file(dir + '/' + path)
+        T = solve(G)
+        assert is_valid_network(G, T)
+        print("Average pairwise distance: {}".format(average_pairwise_distance(T)))
+        write_output_file(T, 'outputs/' + path[:(len(path) - 3)] + '.out')
+
